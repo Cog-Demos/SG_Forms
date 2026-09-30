@@ -1,10 +1,14 @@
 import fs from 'fs'
+import JSZip from 'jszip'
 import path from 'path'
 
 import {
+  createZipInspectionBudget,
   getFileExtension,
   getInvalidFileExtensionsInZip,
   isInvalidFileExtension,
+  MAX_NESTED_ZIP_DEPTH,
+  ZipInspectionLimitError,
 } from '../file-validation'
 
 const RESOURCES = path.join(__dirname, '../../../../__tests__/resources')
@@ -90,6 +94,97 @@ describe('File validation utils', () => {
       const file = fs.readFileSync(path.join(RESOURCES, 'nestedInvalid.zip'))
       const actual = await getInvalidFileExtensionsInZip('nodebuffer', file)
       expect(actual).toEqual(['.a', '.oo'])
+    })
+
+    describe('zip bomb protection', () => {
+      const zipWith = (entries: Record<string, Buffer | string>) => {
+        const zip = new JSZip()
+        Object.entries(entries).forEach(([name, content]) =>
+          zip.file(name, content),
+        )
+        return zip.generateAsync({
+          type: 'nodebuffer',
+          compression: 'DEFLATE',
+        })
+      }
+
+      const nestZips = async (levels: number): Promise<Buffer> => {
+        let current = await zipWith({ 'file.a': 'invalid' })
+        for (let i = 0; i < levels; i++) {
+          current = await zipWith({ 'nested.zip': current })
+        }
+        return current
+      }
+
+      it('should inspect nested zips up to the maximum depth', async () => {
+        const file = await nestZips(MAX_NESTED_ZIP_DEPTH)
+        const actual = await getInvalidFileExtensionsInZip('nodebuffer', file)
+        expect(actual).toEqual(['.a'])
+      })
+
+      it('should reject zips nested deeper than the maximum depth', async () => {
+        const file = await nestZips(MAX_NESTED_ZIP_DEPTH + 1)
+        await expect(
+          getInvalidFileExtensionsInZip('nodebuffer', file),
+        ).rejects.toBeInstanceOf(ZipInspectionLimitError)
+      })
+
+      it('should reject nested zips that decompress beyond the byte budget', async () => {
+        const innerZip = await new JSZip()
+          .file('zeros.txt', Buffer.alloc(2 * 1024 * 1024))
+          .generateAsync({ type: 'nodebuffer', compression: 'STORE' })
+        const file = await zipWith({ 'bomb.zip': innerZip })
+        expect(file.byteLength).toBeLessThan(64 * 1024)
+
+        await expect(
+          getInvalidFileExtensionsInZip(
+            'nodebuffer',
+            file,
+            createZipInspectionBudget(1024 * 1024),
+          ),
+        ).rejects.toBeInstanceOf(ZipInspectionLimitError)
+      })
+
+      it('should share the byte budget across nested zips', async () => {
+        const innerZip = await new JSZip()
+          .file('zeros.txt', Buffer.alloc(600 * 1024))
+          .generateAsync({ type: 'nodebuffer', compression: 'STORE' })
+        const file = await zipWith({ 'a.zip': innerZip, 'b.zip': innerZip })
+
+        await expect(
+          getInvalidFileExtensionsInZip(
+            'nodebuffer',
+            file,
+            createZipInspectionBudget(1024 * 1024),
+          ),
+        ).rejects.toBeInstanceOf(ZipInspectionLimitError)
+      })
+
+      it('should count directory entries towards the entry limit', async () => {
+        const zip = new JSZip()
+        zip.folder('a')
+        zip.folder('b')
+        zip.folder('c')
+        const file = await zip.generateAsync({ type: 'nodebuffer' })
+        await expect(
+          getInvalidFileExtensionsInZip(
+            'nodebuffer',
+            file,
+            createZipInspectionBudget(undefined, 2),
+          ),
+        ).rejects.toBeInstanceOf(ZipInspectionLimitError)
+      })
+
+      it('should reject zips with more entries than allowed', async () => {
+        const file = await zipWith({ 'a.txt': 'a', 'b.txt': 'b', 'c.txt': 'c' })
+        await expect(
+          getInvalidFileExtensionsInZip(
+            'nodebuffer',
+            file,
+            createZipInspectionBudget(undefined, 2),
+          ),
+        ).rejects.toBeInstanceOf(ZipInspectionLimitError)
+      })
     })
   })
 })
