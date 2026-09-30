@@ -363,6 +363,10 @@
           "valueFrom": "/<ENVIRONMENT_SITE_NAME>/BOUNCE_LIFE_SPAN"
         },
         {
+          "name": "SES_NOTIFICATION_TOPIC_ARNS",
+          "valueFrom": "/<ENVIRONMENT_SITE_NAME>/SES_NOTIFICATION_TOPIC_ARNS"
+        },
+        {
           "name": "SES_MAX_MESSAGES",
           "valueFrom": "/<ENVIRONMENT_SITE_NAME>/SES_MAX_MESSAGES"
         },

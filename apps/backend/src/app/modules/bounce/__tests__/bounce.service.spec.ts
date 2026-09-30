@@ -781,6 +781,55 @@ describe('BounceService', () => {
 
     beforeEach(() => {
       body = cloneDeep(MOCK_SNS_BODY)
+      body.Timestamp = new Date().toISOString()
+    })
+
+    const mockValidSignature = () => {
+      const validate = jest.fn((message, callback) => {
+        setTimeout(() => callback(null), 0)
+      })
+      MockedSNSMessageValidator.mockImplementation(() => ({ validate }))
+      return validate
+    }
+
+    it('should reject validly signed messages from a topic that is not in the allowlist', async () => {
+      const validate = mockValidSignature()
+      body.TopicArn = 'arn:aws:sns:us-east-1:999999999999:attacker-topic'
+
+      const result = await BounceService.validateSnsRequest(body)
+
+      expect(result._unsafeUnwrapErr()).toEqual(new InvalidNotificationError())
+      expect(validate).not.toHaveBeenCalled()
+    })
+
+    it('should reject validly signed messages that are not of type Notification', async () => {
+      const validate = mockValidSignature()
+      body.Type = 'SubscriptionConfirmation'
+
+      const result = await BounceService.validateSnsRequest(body)
+
+      expect(result._unsafeUnwrapErr()).toEqual(new InvalidNotificationError())
+      expect(validate).not.toHaveBeenCalled()
+    })
+
+    it('should reject validly signed messages with a stale timestamp', async () => {
+      const validate = mockValidSignature()
+      body.Timestamp = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+      const result = await BounceService.validateSnsRequest(body)
+
+      expect(result._unsafeUnwrapErr()).toEqual(new InvalidNotificationError())
+      expect(validate).not.toHaveBeenCalled()
+    })
+
+    it('should reject validly signed messages with an unparseable timestamp', async () => {
+      const validate = mockValidSignature()
+      body.Timestamp = 'timestamp'
+
+      const result = await BounceService.validateSnsRequest(body)
+
+      expect(result._unsafeUnwrapErr()).toEqual(new InvalidNotificationError())
+      expect(validate).not.toHaveBeenCalled()
     })
 
     it('should reject invalid notification with an InvalidNotificationError', async () => {
@@ -811,6 +860,29 @@ describe('BounceService', () => {
       const result = await BounceService.validateSnsRequest(body)
 
       expect(result._unsafeUnwrap()).toBe(true)
+    })
+  })
+
+  describe('validateSnsMessageOrigin', () => {
+    let body: ISnsNotification
+
+    beforeEach(() => {
+      body = cloneDeep(MOCK_SNS_BODY)
+      body.Timestamp = new Date().toISOString()
+    })
+
+    it('should accept fresh notifications from an allowed topic', () => {
+      const result = BounceService.validateSnsMessageOrigin(body)
+
+      expect(result._unsafeUnwrap()).toBe(true)
+    })
+
+    it('should reject notifications with a timestamp too far in the future', () => {
+      body.Timestamp = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
+      const result = BounceService.validateSnsMessageOrigin(body)
+
+      expect(result._unsafeUnwrapErr()).toEqual(new InvalidNotificationError())
     })
   })
 

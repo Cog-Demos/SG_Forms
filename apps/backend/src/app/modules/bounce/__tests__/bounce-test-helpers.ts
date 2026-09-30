@@ -12,12 +12,16 @@ import {
   ISnsNotification,
 } from 'src/types'
 
+// Must match SES_NOTIFICATION_TOPIC_ARNS in __tests__/setup/.test-env
+export const MOCK_SES_NOTIFICATION_TOPIC_ARN =
+  'arn:aws:sns:ap-southeast-1:123456789012:formsg-ses-notifications'
+
 export const MOCK_SNS_BODY: ISnsNotification = {
-  Type: 'type',
+  Type: 'Notification',
   MessageId: 'message-id',
-  TopicArn: 'topic-arn',
+  TopicArn: MOCK_SES_NOTIFICATION_TOPIC_ARN,
   Message: 'message',
-  Timestamp: 'timestamp',
+  Timestamp: new Date().toISOString(),
   SignatureVersion: '1',
   Signature: 'signature',
   SigningCertURL: 'https://sns.fa-ke-1.amazonaws.com/cert.pem',

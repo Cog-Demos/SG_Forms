@@ -261,6 +261,11 @@ const config: Config = {
   formsgSdkMode: basicVars.formsgSdkMode,
   customCloudWatchGroup: basicVars.awsConfig.customCloudWatchGroup,
   bounceLifeSpan: basicVars.mail.bounceLifeSpan,
+  sesNotificationTopicArns: basicVars.mail.sesNotificationTopicArns
+    .split(',')
+    .map((arn) => arn.trim())
+    .filter(Boolean),
+  sesNotificationMaxAge: basicVars.mail.sesNotificationMaxAge,
   chromiumBin: basicVars.mail.chromiumBin,
   port: basicVars.core.port,
   sessionSecret: basicVars.core.sessionSecret,

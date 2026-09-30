@@ -107,6 +107,8 @@ export type Config = {
   chromiumBin: string
   otpLifeSpan: number
   bounceLifeSpan: number
+  sesNotificationTopicArns: string[]
+  sesNotificationMaxAge: number
   formsgSdkMode: PackageMode
   submissionsTopUp: number
   formsTopUp: number
@@ -231,6 +233,8 @@ export interface IOptionalVarsSchema {
     maxMessages: number
     maxConnections: number
     socketTimeout: number
+    sesNotificationTopicArns: string
+    sesNotificationMaxAge: number
   }
   rateLimit: {
     submissions: number
