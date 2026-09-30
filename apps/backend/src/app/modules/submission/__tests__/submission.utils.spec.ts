@@ -8,6 +8,7 @@ import {
 } from 'formsg-shared/types'
 import { readFileSync } from 'fs'
 import { StatusCodes } from 'http-status-codes'
+import JSZip from 'jszip'
 import { cloneDeep, merge } from 'lodash'
 import path from 'path'
 
@@ -606,6 +607,26 @@ describe('submission.utils', () => {
     it('should return invalid extensions when given nested zips with invalid filetypes', async () => {
       const invalid = await getInvalidFileExtensions([zipNestedInvalid])
       expect(invalid).toEqual(['.a', '.oo'])
+    })
+
+    it('should reject when nested zips across attachments decompress beyond the byte limit', async () => {
+      const innerZip = await new JSZip()
+        .file('zeros.txt', Buffer.alloc(600 * 1024))
+        .generateAsync({ type: 'nodebuffer', compression: 'STORE' })
+      const bombZip = {
+        filename: 'bomb.zip',
+        content: await new JSZip()
+          .file('inner.zip', innerZip)
+          .generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }),
+        fieldId: String(new ObjectId()),
+      }
+
+      await expect(
+        getInvalidFileExtensions([bombZip], 1024 * 1024),
+      ).resolves.toEqual([])
+      await expect(
+        getInvalidFileExtensions([bombZip, bombZip], 1024 * 1024),
+      ).toReject()
     })
   })
 

@@ -1050,7 +1050,7 @@ export const validateAttachments = (
     return errAsync(new AttachmentTooLargeError())
   }
   return ResultAsync.fromPromise(
-    getInvalidFileExtensions(attachments),
+    getInvalidFileExtensions(attachments, fileSizeLimitBytes(responseMode)),
     (error) => {
       logger.error({
         message: 'Error while validating attachment file extensions',

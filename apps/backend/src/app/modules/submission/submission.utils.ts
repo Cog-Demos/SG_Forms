@@ -742,11 +742,16 @@ export const isQuarantinedAttachmentResponse = (
  * zip files are checked recursively.
  *
  * @param attachments - Array of file objects
+ * @param maxDecompressedZipBytes - Max total bytes that nested zips across all attachments may decompress to
  * @returns Whether all attachments are valid
  */
 export const getInvalidFileExtensions = (
   attachments: IAttachmentInfo[],
+  maxDecompressedZipBytes?: number,
 ): Promise<string[]> => {
+  const zipInspectionBudget = FileValidation.createZipInspectionBudget(
+    maxDecompressedZipBytes,
+  )
   // Turn it into an array of promises that each resolve
   // to an array of file extensions that are invalid (if any)
   const promises = attachments.map((attachment) => {
@@ -772,6 +777,7 @@ export const getInvalidFileExtensions = (
     return FileValidation.getInvalidFileExtensionsInZip(
       'nodebuffer',
       attachment.content,
+      zipInspectionBudget,
     )
   })
 
