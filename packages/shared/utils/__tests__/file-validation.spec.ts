@@ -160,6 +160,21 @@ describe('File validation utils', () => {
         ).rejects.toBeInstanceOf(ZipInspectionLimitError)
       })
 
+      it('should count directory entries towards the entry limit', async () => {
+        const zip = new JSZip()
+        zip.folder('a')
+        zip.folder('b')
+        zip.folder('c')
+        const file = await zip.generateAsync({ type: 'nodebuffer' })
+        await expect(
+          getInvalidFileExtensionsInZip(
+            'nodebuffer',
+            file,
+            createZipInspectionBudget(undefined, 2),
+          ),
+        ).rejects.toBeInstanceOf(ZipInspectionLimitError)
+      })
+
       it('should reject zips with more entries than allowed', async () => {
         const file = await zipWith({ 'a.txt': 'a', 'b.txt': 'b', 'c.txt': 'c' })
         await expect(

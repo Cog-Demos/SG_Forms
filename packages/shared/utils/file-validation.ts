@@ -184,11 +184,13 @@ export const getInvalidFileExtensionsInZip = (
   ): Promise<string[]> => {
     const zip = await JSZip.loadAsync(file)
     const fileEntries: JSZip.JSZipObject[] = []
+    let entryCount = 0
     zip.forEach((_relativePath, fileEntry) => {
+      entryCount++
       if (!fileEntry.dir) fileEntries.push(fileEntry)
     })
 
-    budget.remainingEntries -= fileEntries.length
+    budget.remainingEntries -= entryCount
     if (budget.remainingEntries < 0) {
       throw new ZipInspectionLimitError('Number of zip entries exceeds limit')
     }
