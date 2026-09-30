@@ -55,6 +55,68 @@ describe('stripe.controller', () => {
   afterAll(async () => await dbHandler.closeDatabase())
   beforeEach(() => jest.clearAllMocks())
 
+  describe('checkPaymentReceiptStatus', () => {
+    const paymentDate = new Date()
+    let paymentId: string
+
+    beforeEach(async () => {
+      await dbHandler.clearCollection(Payment.collection.name)
+      const payment = await Payment.create({
+        formId: MOCK_FORM_ID,
+        targetAccountId: 'acct_MOCK_ACCOUNT_ID',
+        pendingSubmissionId: new ObjectId(),
+        amount: 12345,
+        paymentIntentId: 'pi_MOCK_PAYMENT_INTENT',
+        email: 'formsg@tech.gov.sg',
+        completedPayment: {
+          receiptUrl: 'https://form.gov.sg',
+          submissionId: new ObjectId(),
+          transactionFee: 0,
+          paymentDate,
+        },
+        gstEnabled: false,
+      })
+      paymentId = payment._id.toString()
+    })
+
+    it('should return 200 with paymentDate when the payment belongs to the url formId', async () => {
+      const mockReq = expressHandler.mockRequest({
+        params: { formId: MOCK_FORM_ID, paymentId },
+      })
+      const mockRes = expressHandler.mockResponse()
+
+      await StripeController.checkPaymentReceiptStatus(
+        mockReq,
+        mockRes,
+        jest.fn(),
+      )
+
+      expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.OK)
+      expect(mockRes.json).toHaveBeenCalledWith({
+        isReady: true,
+        paymentDate,
+      })
+    })
+
+    it('should return 404 without payment details when the payment does not belong to the url formId', async () => {
+      const mockReq = expressHandler.mockRequest({
+        params: { formId: new ObjectId().toHexString(), paymentId },
+      })
+      const mockRes = expressHandler.mockResponse()
+
+      await StripeController.checkPaymentReceiptStatus(
+        mockReq,
+        mockRes,
+        jest.fn(),
+      )
+
+      expect(mockRes.status).toHaveBeenCalledWith(StatusCodes.NOT_FOUND)
+      expect(mockRes.json).not.toHaveBeenCalledWith(
+        expect.objectContaining({ paymentDate }),
+      )
+    })
+  })
+
   describe('_handleConnectOauthCallback', () => {
     beforeEach(async () => {
       await dbHandler.clearCollection(Payment.collection.name)

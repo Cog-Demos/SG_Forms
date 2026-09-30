@@ -14,7 +14,10 @@ import getPaymentModel from 'src/app/models/payment.server.model'
 
 import { InvalidDomainError } from '../../auth/auth.errors'
 import { DatabaseError } from '../../core/core.errors'
-import { InvalidPaymentProductsError } from '../payments.errors'
+import {
+  InvalidPaymentProductsError,
+  PaymentNotFoundError,
+} from '../payments.errors'
 import * as PaymentsService from '../payments.service'
 
 const Payment = getPaymentModel(mongoose)
@@ -76,6 +79,50 @@ describe('payments.service', () => {
         new ObjectId().toHexString(),
       )
       expect(result.isErr()).toBeTrue()
+    })
+  })
+
+  describe('findPaymentByIdAndFormId', () => {
+    const paymentId = new ObjectId()
+
+    beforeEach(async () => {
+      await dbHandler.clearCollection(Payment.collection.name)
+      await Payment.create({
+        _id: paymentId,
+        formId: MOCK_FORM_ID,
+        targetAccountId: 'acct_MOCK_ACCOUNT_ID',
+        pendingSubmissionId: new ObjectId(),
+        paymentIntentId: 'somePaymentIntentId',
+        amount: 314159,
+        email: 'someone@mail.com',
+        gstEnabled: false,
+      })
+    })
+
+    it('should return the payment if it belongs to the form', async () => {
+      const result = await PaymentsService.findPaymentByIdAndFormId(
+        paymentId.toHexString(),
+        MOCK_FORM_ID,
+      )
+      expect(result._unsafeUnwrap()._id.toString()).toEqual(
+        paymentId.toHexString(),
+      )
+    })
+
+    it('should return PaymentNotFoundError if the payment belongs to a different form', async () => {
+      const result = await PaymentsService.findPaymentByIdAndFormId(
+        paymentId.toHexString(),
+        new ObjectId().toHexString(),
+      )
+      expect(result._unsafeUnwrapErr()).toBeInstanceOf(PaymentNotFoundError)
+    })
+
+    it('should return PaymentNotFoundError if the payment id is not found', async () => {
+      const result = await PaymentsService.findPaymentByIdAndFormId(
+        new ObjectId().toHexString(),
+        MOCK_FORM_ID,
+      )
+      expect(result._unsafeUnwrapErr()).toBeInstanceOf(PaymentNotFoundError)
     })
   })
 

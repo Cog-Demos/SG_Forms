@@ -55,7 +55,7 @@ export const checkPaymentReceiptStatus: ControllerHandler<{
     },
   })
 
-  return PaymentService.findPaymentById(paymentId)
+  return PaymentService.findPaymentByIdAndFormId(paymentId, formId)
     .map((payment) => {
       logger.info({
         message: 'Found paymentId in payment document',

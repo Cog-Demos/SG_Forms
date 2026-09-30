@@ -18,6 +18,7 @@ export const PaymentsRouter = Router()
  */
 PaymentsRouter.get(
   '/:formId([a-fA-F0-9]{24})/:paymentId([a-fA-F0-9]{24})/receipt/status',
+  limitRate({ max: rateLimitConfig.submissions }),
   StripeController.checkPaymentReceiptStatus,
 )
 

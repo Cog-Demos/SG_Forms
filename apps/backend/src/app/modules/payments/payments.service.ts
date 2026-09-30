@@ -75,6 +75,40 @@ export const findPaymentById = (
 }
 
 /**
+ * Retrieves payment by Id, scoped to the given form.
+ * @param paymentId the payment id of the payment to be retrieved
+ * @param formId the id of the form the payment must belong to
+ * @returns ok(payment) if payment exists and belongs to the form
+ * @returns err(PaymentNotFoundError) if the payment does not exist for the form
+ * @returns err(DatabaseError) if error occurs whilst querying the database
+ */
+export const findPaymentByIdAndFormId = (
+  paymentId: IPaymentSchema['_id'],
+  formId: IPaymentSchema['formId'],
+): ResultAsync<IPaymentSchema, PaymentNotFoundError | DatabaseError> => {
+  return ResultAsync.fromPromise(
+    PaymentModel.findOne({ _id: paymentId, formId }, null, {
+      readPreference: 'primary',
+    }).exec(),
+    (error) => {
+      logger.error({
+        message: 'Database error while finding payment by id and form id',
+        meta: {
+          action: 'findPaymentByIdAndFormId',
+          paymentId,
+          formId,
+        },
+        error,
+      })
+      return new DatabaseError(getMongoErrorMessage(error))
+    },
+  ).andThen((result) => {
+    if (!result) return errAsync(new PaymentNotFoundError())
+    return okAsync(result)
+  })
+}
+
+/**
  * Retrieves submission document of the given SubmissionId.
  * @param submissionId the submissionId of the payment to be retrieved
  * @param update mongoose update to perform
