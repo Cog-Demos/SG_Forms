@@ -38,7 +38,7 @@ export const downloadPaymentInvoice: ControllerHandler<{
   })
 
   return ResultAsync.combine([
-    PaymentService.findPaymentById(paymentId),
+    PaymentService.findPaymentByIdAndFormId(paymentId, formId),
     FormService.retrieveFullFormById(formId).andThen(
       checkFormIsEncryptModeOrMultirespondent,
     ),
