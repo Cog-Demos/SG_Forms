@@ -306,6 +306,18 @@ export const optionalVarsSchema: Schema<IOptionalVarsSchema> = {
       default: 600000,
       env: 'MAIL_SOCKET_TIMEOUT',
     },
+    sesNotificationTopicArns: {
+      doc: 'Comma-separated list of SNS topic ARNs that are allowed to deliver SES bounce/delivery notifications. Notifications from any other topic are rejected.',
+      format: String,
+      default: '',
+      env: 'SES_NOTIFICATION_TOPIC_ARNS',
+    },
+    sesNotificationMaxAge: {
+      doc: 'Maximum age in milliseconds of an SNS notification, based on its Timestamp, before it is rejected',
+      format: 'int',
+      default: 900000,
+      env: 'SES_NOTIFICATION_MAX_AGE',
+    },
   },
   awsConfig: {
     region: {

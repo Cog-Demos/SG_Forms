@@ -173,6 +173,8 @@ SITE_BANNER_CONTENT=hello:This is an invalid banner type, and the full text will
 | `MAIL_DEBUG`          | If set to `true`, then logs SMTP traffic, otherwise logs only transaction events.                                                                                                                                    |
 | `CHROMIUM_BIN`        | Filepath to chromium binary. Required for email autoreply PDF generation with Puppeteer.                                                                                                                             |
 | `BOUNCE_LIFE_SPAN`    | Time in milliseconds that bounces are tracked for each form. Defaults to 86400000ms or 24 hours. Only relevant if you have set up AWS to send bounce and delivery notifications to the /emailnotifications endpoint. |
+| `SES_NOTIFICATION_TOPIC_ARNS` | Comma-separated list of SNS topic ARNs allowed to deliver SES bounce and delivery notifications. Notifications from any other topic are rejected, so this must be set for bounce handling to work. |
+| `SES_NOTIFICATION_MAX_AGE` | Maximum age in milliseconds of an SES notification (based on the SNS `Timestamp`) before it is rejected. Defaults to `900000` (15 minutes). |
 
 **Rate limits at specific endpoints**
 

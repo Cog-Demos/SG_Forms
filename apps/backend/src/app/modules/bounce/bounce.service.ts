@@ -1,6 +1,6 @@
 import { difference } from 'lodash'
 import mongoose from 'mongoose'
-import { errAsync, okAsync, Result, ResultAsync } from 'neverthrow'
+import { err, errAsync, ok, okAsync, Result, ResultAsync } from 'neverthrow'
 import SNSMessageValidator from 'sns-validator'
 
 import {
@@ -10,6 +10,7 @@ import {
   IPopulatedForm,
   ISnsNotification,
 } from '../../../types'
+import config from '../../config/config'
 import {
   createCloudWatchLogger,
   createLoggerWithLabel,
@@ -46,25 +47,74 @@ const Bounce = getBounceModel(mongoose)
 // does not adequately validate that requests only come from SNS.
 const AWS_SNS_HOSTNAME = /^sns\.[a-z]{2}-[a-z]+-\d+\.amazonaws.com$/
 
+const SNS_NOTIFICATION_TYPE = 'Notification'
+
+/**
+ * Verifies that an SNS message is a notification published to one of this
+ * deployment's configured SES notification topics, and that it is recent.
+ * The SNS signature alone only proves that the message came from some SNS
+ * topic, which could belong to any AWS account.
+ * @param body Body of Express request object
+ * @returns true if the message type, topic and timestamp are acceptable
+ */
+export const validateSnsMessageOrigin = (
+  body: ISnsNotification,
+): Result<true, InvalidNotificationError> => {
+  const rejectWith = (reason: string) => {
+    logger.warn({
+      message: 'Rejected SNS notification',
+      meta: {
+        action: 'validateSnsMessageOrigin',
+        reason,
+        type: body?.Type,
+        topicArn: body?.TopicArn,
+        timestamp: body?.Timestamp,
+        messageId: body?.MessageId,
+      },
+    })
+    return err(new InvalidNotificationError())
+  }
+
+  if (body?.Type !== SNS_NOTIFICATION_TYPE) {
+    return rejectWith('Unexpected SNS message type')
+  }
+  if (!config.sesNotificationTopicArns.includes(body.TopicArn)) {
+    return rejectWith('SNS topic is not in the allowlist')
+  }
+  const timestamp = Date.parse(body.Timestamp)
+  if (
+    Number.isNaN(timestamp) ||
+    Math.abs(Date.now() - timestamp) > config.sesNotificationMaxAge
+  ) {
+    return rejectWith('SNS message timestamp is invalid or expired')
+  }
+  return ok(true)
+}
+
 /**
  * Verifies if a request object is correctly signed by Amazon SNS. More info:
  * https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html
  * Uses AWS provided https://github.com/aws/aws-js-sns-message-validator
+ * Also checks that the message originates from an allowed SES notification
+ * topic and is recent, see validateSnsMessageOrigin.
  * @param body Body of Express request object
- * @returns true if request shape and signature are valid
+ * @returns true if request shape, origin and signature are valid
  */
 export const validateSnsRequest = (
   body: ISnsNotification,
 ): ResultAsync<true, InvalidNotificationError> => {
+  const originResult = validateSnsMessageOrigin(body)
+  if (originResult.isErr()) return errAsync(originResult.error)
+
   return ResultAsync.fromPromise(
-    new Promise((resolve, reject) => {
+    new Promise<true>((resolve, reject) => {
       const snsValidator = new SNSMessageValidator(AWS_SNS_HOSTNAME)
 
       snsValidator.validate(
         body as unknown as Record<string, unknown>,
-        (err) => {
-          if (err) {
-            reject(err)
+        (validationError) => {
+          if (validationError) {
+            reject(validationError)
             return
           }
 

@@ -34,6 +34,7 @@ services:
       - GUARDDUTY_CLEAN_S3_BUCKET=local-guardduty-clean-bucket
       - FORMSG_SDK_MODE=development
       - BOUNCE_LIFE_SPAN=86400000
+      - SES_NOTIFICATION_TOPIC_ARNS=arn:aws:sns:ap-southeast-1:000000000000:local-ses-notifications
       - AWS_ACCESS_KEY_ID=fakeKey
       - AWS_SECRET_ACCESS_KEY=fakeSecret
       - SESSION_SECRET=thisisasecret
