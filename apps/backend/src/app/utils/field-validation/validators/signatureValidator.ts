@@ -68,7 +68,12 @@ const isSignatureResponseV4: ResponseValidator<
   }
   const { answer } = response as SignatureResponseV4
   // Empty signature (optional field left blank)
-  if (Array.isArray(answer?.value) && answer.value.length === 0) {
+  const answerType: string | undefined = answer?.type
+  if (
+    (answerType === '' || answerType === 'draw') &&
+    Array.isArray(answer.value) &&
+    answer.value.length === 0
+  ) {
     return right(response as SignatureResponseV4)
   }
   if (

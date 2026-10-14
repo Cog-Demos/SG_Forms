@@ -121,14 +121,27 @@ describe('Signature field validation V4', () => {
     expect(validateResult.isOk()).toBe(true)
   })
 
-  it('should allow an empty signature', () => {
+  it.each(['', 'draw'])(
+    "should allow an empty signature with type '%s'",
+    (type) => {
+      const validateResult = validateFieldV4({
+        formId: 'formId',
+        formField,
+        response: makeSignatureResponseV4({ type, value: [] }),
+        isVisible: true,
+      })
+      expect(validateResult.isOk()).toBe(true)
+    },
+  )
+
+  it('should reject an empty signature with an unknown type', () => {
     const validateResult = validateFieldV4({
       formId: 'formId',
       formField,
-      response: makeSignatureResponseV4({ type: 'draw', value: [] }),
+      response: makeSignatureResponseV4({ type: 'text', value: [] }),
       isVisible: true,
     })
-    expect(validateResult.isOk()).toBe(true)
+    expect(validateResult.isErr()).toBe(true)
   })
 
   it.each([
