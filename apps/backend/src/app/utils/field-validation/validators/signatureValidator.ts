@@ -1,6 +1,9 @@
 import { SignatureAnswerV4 } from '@opengovsg/formsg-sdk'
 import { BasicField } from 'formsg-shared/types'
-import { isValidSignatureVectorArray } from 'formsg-shared/utils/signature'
+import {
+  isValidSignatureVectorArray,
+  SIGNATURE_MAX_INPUT_LENGTH,
+} from 'formsg-shared/utils/signature'
 import { left, right } from 'fp-ts/lib/Either'
 import { flow } from 'fp-ts/lib/function'
 
@@ -21,10 +24,16 @@ type SignatureValidatorConstructor = (
 const signatureAnswerValidator: SignatureValidator = (response) => {
   const answerArray: string[] = response.answerArray
   const [type, value] = answerArray
-  // Empty signature (e.g. optional field left blank)
-  if (!value) return right(response)
-  if (type !== 'draw' || answerArray.length !== 2) {
+  if (answerArray.length !== 2) {
     return left(`SignatureValidator:\tanswerArray has invalid shape`)
+  }
+  // Empty signature (e.g. optional field left blank is ['', ''])
+  if (value === '' && (type === '' || type === 'draw')) return right(response)
+  if (type !== 'draw' || !value) {
+    return left(`SignatureValidator:\tanswerArray has invalid shape`)
+  }
+  if (value.length > SIGNATURE_MAX_INPUT_LENGTH) {
+    return left(`SignatureValidator:\tsignature exceeds maximum length`)
   }
   let vectorArray: unknown
   try {
@@ -58,6 +67,10 @@ const isSignatureResponseV4: ResponseValidator<
     )
   }
   const { answer } = response as SignatureResponseV4
+  // Empty signature (optional field left blank)
+  if (Array.isArray(answer?.value) && answer.value.length === 0) {
+    return right(response as SignatureResponseV4)
+  }
   if (
     !answer ||
     answer.type !== 'draw' ||

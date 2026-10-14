@@ -22,12 +22,7 @@ export const convertToSignaturePngBuffer = (
   vectorArray: SignatureVectorArray,
   padding = SIGNATURE_OUTPUT_PADDING_DEFAULT,
 ): Buffer => {
-  if (
-    !isValidSignatureVectorArray(vectorArray) ||
-    vectorArray.every((stroke) => stroke.length === 0)
-  ) {
-    return Buffer.alloc(0)
-  }
+  if (!isValidSignatureVectorArray(vectorArray)) return Buffer.alloc(0)
 
   // Calculate bounding box
   const { minX, minY, maxX, maxY } = getBoundingBox(vectorArray)
@@ -37,6 +32,9 @@ export const convertToSignaturePngBuffer = (
   // Drawing size includes padding on all sides
   const drawingWidth = boxWidth + 2 * padding
   const drawingHeight = boxHeight + 2 * padding
+  if (!Number.isFinite(drawingWidth) || !Number.isFinite(drawingHeight)) {
+    return Buffer.alloc(0)
+  }
 
   // default dpr to 3 for overall sharpness, scaling down to fit the max size
   const scale = Math.min(
@@ -99,6 +97,7 @@ export const convertToSignaturePngDataUri = (
   vectorArray: SignatureVectorArray,
 ): string => {
   const pngBuffer: Buffer = convertToSignaturePngBuffer(vectorArray)
+  if (pngBuffer.length === 0) return ''
 
   const base64 = pngBuffer.toString('base64')
   return `data:image/png;base64,${base64}`

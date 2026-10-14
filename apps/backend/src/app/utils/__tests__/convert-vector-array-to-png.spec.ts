@@ -1,7 +1,9 @@
 import { SignatureVectorArray } from 'formsg-shared/types'
+import { SIGNATURE_MAX_COORDINATE } from 'formsg-shared/utils/signature'
 
 import {
   convertToSignaturePngBuffer,
+  convertToSignaturePngDataUri,
   SIGNATURE_PNG_MAX_HEIGHT,
   SIGNATURE_PNG_MAX_WIDTH,
 } from 'src/app/utils/convert-vector-array-to-png'
@@ -41,11 +43,11 @@ describe('convertToSignaturePngBuffer', () => {
     expect(height).toBeLessThanOrEqual(SIGNATURE_PNG_MAX_HEIGHT)
   })
 
-  it('should cap canvas size for extreme coordinates', () => {
+  it('should cap canvas size for coordinates at the allowed limit', () => {
     const signature: SignatureVectorArray = [
       [
-        [-1e12, 0, 0.5],
-        [1e12, 1, 0.5],
+        [-SIGNATURE_MAX_COORDINATE, 0, 0.5],
+        [SIGNATURE_MAX_COORDINATE, 1, 0.5],
       ],
     ]
     const { width, height } = getPngDimensions(
@@ -60,9 +62,24 @@ describe('convertToSignaturePngBuffer', () => {
     ['a string', 'x'],
     ['non-numeric points', [[['a', 'b', 'c']]]],
     ['strokes without points', [[]]],
+    [
+      'overflowing coordinates',
+      [
+        [
+          [-Number.MAX_VALUE, 0, 0.5],
+          [Number.MAX_VALUE, 0, 0.5],
+        ],
+      ],
+    ],
   ])('should return an empty buffer for %s', (_, input) => {
     expect(
       convertToSignaturePngBuffer(input as unknown as SignatureVectorArray),
     ).toEqual(Buffer.alloc(0))
+  })
+})
+
+describe('convertToSignaturePngDataUri', () => {
+  it('should return an empty string when there is nothing to render', () => {
+    expect(convertToSignaturePngDataUri([[]])).toBe('')
   })
 })

@@ -4,7 +4,11 @@ import {
 } from '__tests__/unit/backend/helpers/generate-form-data'
 import { ObjectId } from 'bson'
 import { BasicField } from 'formsg-shared/types'
-import { SIGNATURE_MAX_POINTS } from 'formsg-shared/utils/signature'
+import {
+  SIGNATURE_MAX_COORDINATE,
+  SIGNATURE_MAX_INPUT_LENGTH,
+  SIGNATURE_MAX_POINTS,
+} from 'formsg-shared/utils/signature'
 
 import {
   ValidateFieldError,
@@ -44,8 +48,11 @@ describe('Signature field validation', () => {
     expect(validateResult.isOk()).toBe(true)
   })
 
-  it('should allow an empty signature', () => {
-    const response = makeSignatureResponse(['draw', ''])
+  it.each([
+    ['canonical blank', ['', '']],
+    ['blank draw', ['draw', '']],
+  ])('should allow an empty signature (%s)', (_, answerArray) => {
+    const response = makeSignatureResponse(answerArray)
     const validateResult = validateField('formId', formField, response)
     expect(validateResult.isOk()).toBe(true)
   })
@@ -57,6 +64,19 @@ describe('Signature field validation', () => {
     ['non-finite points', ['draw', '[[[0,0,0.5],[1e999,0,0.5]]]']],
     ['wrong point arity', ['draw', '[[[0,0]]]']],
     ['unknown signature type', ['text', JSON.stringify(VALID_SIGNATURE)]],
+    ['blank value with unknown type', ['text', '']],
+    ['extra answerArray entries', ['draw', '', 'extra']],
+    ['empty vector array', ['draw', '[]']],
+    ['strokes without points', ['draw', '[[]]']],
+    [
+      'out-of-range coordinates',
+      ['draw', `[[[0,0,0.5],[${SIGNATURE_MAX_COORDINATE + 1},0,0.5]]]`],
+    ],
+    [
+      'overflowing coordinates',
+      ['draw', '[[[-1.7e308,0,0.5],[1.7e308,0,0.5]]]'],
+    ],
+    ['over-length input', ['draw', ' '.repeat(SIGNATURE_MAX_INPUT_LENGTH + 1)]],
     [
       'too many points',
       [
@@ -101,14 +121,33 @@ describe('Signature field validation V4', () => {
     expect(validateResult.isOk()).toBe(true)
   })
 
-  it('should reject a signature with non-numeric points', () => {
+  it('should allow an empty signature', () => {
     const validateResult = validateFieldV4({
       formId: 'formId',
       formField,
-      response: makeSignatureResponseV4({
-        type: 'draw',
-        value: [[['a', 'b', 'c']]],
-      }),
+      response: makeSignatureResponseV4({ type: 'draw', value: [] }),
+      isVisible: true,
+    })
+    expect(validateResult.isOk()).toBe(true)
+  })
+
+  it.each([
+    ['non-numeric points', [[['a', 'b', 'c']]]],
+    ['strokes without points', [[]]],
+    [
+      'overflowing coordinates',
+      [
+        [
+          [-Number.MAX_VALUE, 0, 0.5],
+          [Number.MAX_VALUE, 0, 0.5],
+        ],
+      ],
+    ],
+  ])('should reject a signature with %s', (_, value) => {
+    const validateResult = validateFieldV4({
+      formId: 'formId',
+      formField,
+      response: makeSignatureResponseV4({ type: 'draw', value }),
       isVisible: true,
     })
     expect(validateResult.isErr()).toBe(true)
