@@ -4,6 +4,7 @@ import {
   BOX_HEIGHT_DEFAULT,
   BOX_WIDTH_DEFAULT,
   getBoundingBox,
+  isValidSignatureVectorArray,
   SIGNATURE_OUTPUT_PADDING_DEFAULT,
   SIGNATURE_OUTPUT_STROKE_FILL_STYLE,
   SIGNATURE_STROKE_SIZE,
@@ -13,30 +14,52 @@ import {
 } from 'formsg-shared/utils/signature'
 import getStroke from 'perfect-freehand'
 
+// Upper bound on rendered output so signature data cannot dictate canvas size
+export const SIGNATURE_PNG_MAX_WIDTH = 2000
+export const SIGNATURE_PNG_MAX_HEIGHT = 1000
+
 export const convertToSignaturePngBuffer = (
   vectorArray: SignatureVectorArray,
   padding = SIGNATURE_OUTPUT_PADDING_DEFAULT,
 ): Buffer => {
-  if (vectorArray.length === 0) return Buffer.alloc(0)
+  if (
+    !isValidSignatureVectorArray(vectorArray) ||
+    vectorArray.every((stroke) => stroke.length === 0)
+  ) {
+    return Buffer.alloc(0)
+  }
 
   // Calculate bounding box
   const { minX, minY, maxX, maxY } = getBoundingBox(vectorArray)
   const boxWidth = maxX - minX || BOX_WIDTH_DEFAULT
   const boxHeight = maxY - minY || BOX_HEIGHT_DEFAULT
 
-  // default dpr to 3 for overall sharpness
-  const dpr = 3
-  // Canvas size includes padding on all sides
-  const canvasWidth = (boxWidth + 2 * padding) * dpr
-  const canvasHeight = (boxHeight + 2 * padding) * dpr
+  // Drawing size includes padding on all sides
+  const drawingWidth = boxWidth + 2 * padding
+  const drawingHeight = boxHeight + 2 * padding
+
+  // default dpr to 3 for overall sharpness, scaling down to fit the max size
+  const scale = Math.min(
+    3,
+    SIGNATURE_PNG_MAX_WIDTH / drawingWidth,
+    SIGNATURE_PNG_MAX_HEIGHT / drawingHeight,
+  )
+  const canvasWidth = Math.min(
+    SIGNATURE_PNG_MAX_WIDTH,
+    Math.max(1, Math.ceil(drawingWidth * scale)),
+  )
+  const canvasHeight = Math.min(
+    SIGNATURE_PNG_MAX_HEIGHT,
+    Math.max(1, Math.ceil(drawingHeight * scale)),
+  )
 
   const canvas = createCanvas(canvasWidth, canvasHeight)
   const ctx = canvas.getContext('2d')
 
-  // Scale the context to account for dpr
-  ctx.scale(dpr, dpr)
   ctx.fillStyle = 'white'
   ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+  // Scale the context to account for dpr / downscaling
+  ctx.scale(scale, scale)
 
   // Draw strokes
   for (const stroke of vectorArray) {

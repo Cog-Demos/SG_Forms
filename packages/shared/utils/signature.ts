@@ -13,6 +13,9 @@ export const BOX_WIDTH_DEFAULT = 1
 
 export const SIGNATURE_CAPTURED_STRING = 'Signature captured'
 
+export const SIGNATURE_MAX_STROKES = 1000
+export const SIGNATURE_MAX_POINTS = 20000
+
 /**
  *  converts a vectorArray to a string output
  * @param input - signature vector array
@@ -33,6 +36,33 @@ export const convertToSignatureVectorArray = (
   input: string,
 ): SignatureVectorArray => {
   return JSON.parse(input)
+}
+
+const isSignaturePoint = (point: unknown): point is [number, number, number] =>
+  Array.isArray(point) &&
+  point.length === 3 &&
+  point.every((n) => typeof n === 'number' && Number.isFinite(n))
+
+/**
+ * Checks that the input is a well-formed signature vector array of finite
+ * [x, y, pressure] points, within the stroke and point limits.
+ * @param input - value to check
+ * @returns true if input is a valid SignatureVectorArray
+ */
+export const isValidSignatureVectorArray = (
+  input: unknown,
+): input is SignatureVectorArray => {
+  if (!Array.isArray(input) || input.length > SIGNATURE_MAX_STROKES) {
+    return false
+  }
+  let totalPoints = 0
+  for (const stroke of input) {
+    if (!Array.isArray(stroke)) return false
+    totalPoints += stroke.length
+    if (totalPoints > SIGNATURE_MAX_POINTS) return false
+    if (!stroke.every(isSignaturePoint)) return false
+  }
+  return true
 }
 
 type BoundingBox = {

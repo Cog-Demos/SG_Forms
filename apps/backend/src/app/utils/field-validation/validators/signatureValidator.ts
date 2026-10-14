@@ -1,5 +1,6 @@
 import { SignatureAnswerV4 } from '@opengovsg/formsg-sdk'
 import { BasicField } from 'formsg-shared/types'
+import { isValidSignatureVectorArray } from 'formsg-shared/utils/signature'
 import { left, right } from 'fp-ts/lib/Either'
 import { flow } from 'fp-ts/lib/function'
 
@@ -18,8 +19,22 @@ type SignatureValidatorConstructor = (
 ) => SignatureValidator
 
 const signatureAnswerValidator: SignatureValidator = (response) => {
-  // TODO: add proper validators signature field v1.1
-  return right(response)
+  const answerArray: string[] = response.answerArray
+  const [type, value] = answerArray
+  // Empty signature (e.g. optional field left blank)
+  if (!value) return right(response)
+  if (type !== 'draw' || answerArray.length !== 2) {
+    return left(`SignatureValidator:\tanswerArray has invalid shape`)
+  }
+  let vectorArray: unknown
+  try {
+    vectorArray = JSON.parse(value)
+  } catch {
+    return left(`SignatureValidator:\tsignature is not valid JSON`)
+  }
+  return isValidSignatureVectorArray(vectorArray)
+    ? right(response)
+    : left(`SignatureValidator:\tsignature vector array is invalid`)
 }
 
 export const constructSignatureValidator: SignatureValidatorConstructor = () =>
@@ -40,6 +55,16 @@ const isSignatureResponseV4: ResponseValidator<
   if (response.fieldType !== BasicField.Signature) {
     return left(
       `SignatureValidatorV4.fieldTypeMismatch:\tfieldType is not signature`,
+    )
+  }
+  const { answer } = response as SignatureResponseV4
+  if (
+    !answer ||
+    answer.type !== 'draw' ||
+    !isValidSignatureVectorArray(answer.value)
+  ) {
+    return left(
+      `SignatureValidatorV4.invalidAnswer:\tsignature vector array is invalid`,
     )
   }
   return right(response as SignatureResponseV4)
