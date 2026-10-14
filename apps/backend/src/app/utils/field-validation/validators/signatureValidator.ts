@@ -1,5 +1,9 @@
 import { SignatureAnswerV4 } from '@opengovsg/formsg-sdk'
 import { BasicField } from 'formsg-shared/types'
+import {
+  isValidSignatureVectorArray,
+  SIGNATURE_MAX_INPUT_LENGTH,
+} from 'formsg-shared/utils/signature'
 import { left, right } from 'fp-ts/lib/Either'
 import { flow } from 'fp-ts/lib/function'
 
@@ -18,8 +22,28 @@ type SignatureValidatorConstructor = (
 ) => SignatureValidator
 
 const signatureAnswerValidator: SignatureValidator = (response) => {
-  // TODO: add proper validators signature field v1.1
-  return right(response)
+  const answerArray: string[] = response.answerArray
+  const [type, value] = answerArray
+  if (answerArray.length !== 2) {
+    return left(`SignatureValidator:\tanswerArray has invalid shape`)
+  }
+  // Empty signature (e.g. optional field left blank is ['', ''])
+  if (value === '' && (type === '' || type === 'draw')) return right(response)
+  if (type !== 'draw' || !value) {
+    return left(`SignatureValidator:\tanswerArray has invalid shape`)
+  }
+  if (value.length > SIGNATURE_MAX_INPUT_LENGTH) {
+    return left(`SignatureValidator:\tsignature exceeds maximum length`)
+  }
+  let vectorArray: unknown
+  try {
+    vectorArray = JSON.parse(value)
+  } catch {
+    return left(`SignatureValidator:\tsignature is not valid JSON`)
+  }
+  return isValidSignatureVectorArray(vectorArray)
+    ? right(response)
+    : left(`SignatureValidator:\tsignature vector array is invalid`)
 }
 
 export const constructSignatureValidator: SignatureValidatorConstructor = () =>
@@ -40,6 +64,25 @@ const isSignatureResponseV4: ResponseValidator<
   if (response.fieldType !== BasicField.Signature) {
     return left(
       `SignatureValidatorV4.fieldTypeMismatch:\tfieldType is not signature`,
+    )
+  }
+  const { answer } = response as SignatureResponseV4
+  // Empty signature (optional field left blank)
+  const answerType: string | undefined = answer?.type
+  if (
+    (answerType === '' || answerType === 'draw') &&
+    Array.isArray(answer.value) &&
+    answer.value.length === 0
+  ) {
+    return right(response as SignatureResponseV4)
+  }
+  if (
+    !answer ||
+    answer.type !== 'draw' ||
+    !isValidSignatureVectorArray(answer.value)
+  ) {
+    return left(
+      `SignatureValidatorV4.invalidAnswer:\tsignature vector array is invalid`,
     )
   }
   return right(response as SignatureResponseV4)

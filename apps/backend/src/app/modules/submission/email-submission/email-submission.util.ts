@@ -231,11 +231,14 @@ export const getAnswerForSignature = (
 
   switch (response.answerArray[0]) {
     case 'draw':
-      if (response.answerArray[1].length > 0) {
-        signatureAnswer = convertToSignaturePngDataUri(
-          convertToSignatureVectorArray(response.answerArray[1]),
-        )
-      } else {
+      try {
+        signatureAnswer =
+          response.answerArray[1]?.length > 0
+            ? convertToSignaturePngDataUri(
+                convertToSignatureVectorArray(response.answerArray[1]),
+              )
+            : ''
+      } catch {
         signatureAnswer = ''
       }
       break
